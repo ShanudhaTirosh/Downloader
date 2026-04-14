@@ -18,7 +18,7 @@ from PyQt6.QtGui import (
     QFont, QIcon, QAction, QColor, QMouseEvent, QResizeEvent, QCloseEvent,
 )
 
-from icons import get_icon, get_pixmap
+from icons import get_icon, get_pixmap, get_resource_path
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QStackedWidget, QFrame, QSizePolicy, QSystemTrayIcon, QMenu, QApplication,
@@ -339,7 +339,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(WINDOW_TITLE)
         
         # Use high-res .ico for taskbar/titlebar
-        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "icon.ico")
+        icon_path = get_resource_path(os.path.join("assets", "icon.ico"))
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         else:

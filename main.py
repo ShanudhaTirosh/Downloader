@@ -4,6 +4,7 @@ Initializes logging, database, engines, and launches the main window.
 """
 
 import sys
+import os
 import logging
 import traceback
 import ctypes
@@ -24,6 +25,7 @@ from config import (
     LOG_LEVEL,
 )
 from theme import get_stylesheet
+from icons import get_resource_path
 
 
 def setup_logging() -> None:
@@ -119,9 +121,9 @@ def global_exception_handler(exc_type: type, exc_value: BaseException, exc_tb: o
 
 def main() -> None:
     """Application entry point."""
-    # Fix taskbar icon on Windows
+    # Fix taskbar icon on Windows - must match the AppID used in the installer
     if sys.platform == "win32":
-        myappid = 'shanufx.downloader.app.v1'
+        myappid = 'ShanuFx.Downloader.v1'
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
     setup_logging()
@@ -138,6 +140,11 @@ def main() -> None:
 
     # Apply theme
     app.setStyleSheet(get_stylesheet())
+
+    # Set application icon globally
+    icon_path = get_resource_path(os.path.join("assets", "icon.ico"))
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
 
     # Set default font
     font = QFont("Segoe UI", 10)
