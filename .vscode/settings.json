@@ -1,0 +1,7 @@
+{
+    "python.defaultInterpreterPath": "C:\\Users\\tiros\\miniconda3\\envs\\downloader\\python.exe",
+    "python.analysis.extraPaths": [
+        "./"
+    ],
+    "python.linting.enabled": true
+}

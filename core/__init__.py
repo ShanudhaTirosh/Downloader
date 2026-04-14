@@ -1,0 +1,1 @@
+# ShanuFx Downloader — Core package
