@@ -11,7 +11,7 @@ import ctypes
 from logging.handlers import RotatingFileHandler
 from typing import Optional
 
-from PyQt6.QtWidgets import QApplication, QMessageBox, QDialog, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QTextEdit
+from PyQt6.QtWidgets import QApplication, QMessageBox, QDialog, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QTextEdit, QSplashScreen
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QIcon
 
@@ -121,7 +121,35 @@ def global_exception_handler(exc_type: type, exc_value: BaseException, exc_tb: o
 
 def main() -> None:
     """Application entry point."""
-    # Fix taskbar icon on Windows - must match the AppID used in the installer
+    # 1. Initialize Application
+    app = QApplication(sys.argv)
+    app.setApplicationName(APP_NAME)
+    app.setApplicationVersion(APP_VERSION)
+    app.setOrganizationName("ShanuFx")
+    app.setOrganizationDomain("shanufx.com")
+
+    # 2. Ensure Single Instance (Fastest check)
+    _instance_mutex = None
+    if sys.platform == "win32":
+        # Simplified name to avoid permission issues
+        mutex_name = "ShanuFxDownloader_Instance_Mutex"
+        kernel32 = ctypes.windll.kernel32
+        _instance_mutex = kernel32.CreateMutexW(None, False, mutex_name)
+        if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+            # Just exit silently if another instance is running
+            sys.exit(0)
+    
+    # 3. Show Splash Screen immediately
+    icon_path = get_resource_path(os.path.join("assets", "icon.ico"))
+    splash = None
+    if os.path.exists(icon_path):
+        from PyQt6.QtGui import QPixmap
+        splash = QSplashScreen(QPixmap(icon_path))
+        splash.show()
+        splash.showMessage("Initializing...", Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter, Qt.GlobalColor.white)
+        app.processEvents()
+
+    # 4. Perform setup (Heavy lifting)
     if sys.platform == "win32":
         myappid = 'ShanuFx.Downloader.v1'
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
@@ -132,17 +160,10 @@ def main() -> None:
 
     sys.excepthook = global_exception_handler
 
-    app = QApplication(sys.argv)
-    app.setApplicationName(APP_NAME)
-    app.setApplicationVersion(APP_VERSION)
-    app.setOrganizationName("ShanuFx")
-    app.setOrganizationDomain("shanufx.com")
-
     # Apply theme
     app.setStyleSheet(get_stylesheet())
 
     # Set application icon globally
-    icon_path = get_resource_path(os.path.join("assets", "icon.ico"))
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 
@@ -151,12 +172,17 @@ def main() -> None:
     app.setFont(font)
 
     # Initialize database
+    if splash: splash.showMessage("Loading Database...", Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter, Qt.GlobalColor.white)
+    app.processEvents()
+    
     from core.db import DatabaseManager
-
     db = DatabaseManager()
     logger.info("Database initialized")
 
     # Initialize engines
+    if splash: splash.showMessage("Loading Engines...", Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter, Qt.GlobalColor.white)
+    app.processEvents()
+    
     from core.queue_manager import QueueManager
     from core.social_extractor import SocialExtractor
     from core.torrent_engine import TorrentEngine
@@ -181,23 +207,52 @@ def main() -> None:
     logger.info("Engines initialized")
 
     # Create and show main window
+    if splash: splash.showMessage("Launching Interface...", Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter, Qt.GlobalColor.white)
+    app.processEvents()
+    
     from ui.main_window import MainWindow
 
     window = MainWindow(db, queue_manager, social_extractor, torrent_engine)
+    
+    if splash:
+        splash.finish(window)
+        
     window.show()
 
     logger.info("Main window displayed")
 
     exit_code = app.exec()
 
-    # Graceful shutdown
-    queue_manager.shutdown()
-    torrent_engine.shutdown()
-    social_extractor.shutdown()
-    db.shutdown()
+    # 5. Shutdown Sequence with Failsafe Timeout
+    logger.info("Starting shutdown sequence...")
+    
+    # Start a watchdog thread that will force-exit the process if shutdown hangs
+    def shutdown_watchdog():
+        import time
+        time.sleep(2.0) # 2 second limit for graceful shutdown
+        logger.warning("Graceful shutdown took too long. Force exiting now.")
+        os._exit(exit_code)
+    
+    import threading
+    watchdog = threading.Thread(target=shutdown_watchdog, daemon=True)
+    watchdog.start()
+
+    # Attempt graceful shutdown
+    try:
+        queue_manager.shutdown()
+        torrent_engine.shutdown()
+        social_extractor.shutdown()
+        db.shutdown()
+    except Exception as e:
+        logger.error("Error during shutdown cleanup: %s", e)
 
     logger.info("Shutdown complete (exit code %d)", exit_code)
-    sys.exit(exit_code)
+    
+    # Final cleanup of the mutex and exit
+    if '_instance_mutex' in locals() and _instance_mutex:
+        ctypes.windll.kernel32.CloseHandle(_instance_mutex)
+    
+    os._exit(exit_code)
 
 
 if __name__ == "__main__":

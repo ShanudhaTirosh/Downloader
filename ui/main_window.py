@@ -521,10 +521,14 @@ class MainWindow(QMainWindow):
             subprocess.run(["xdg-open", dl_dir])
 
     def _quit(self) -> None:
-        self._queue.shutdown()
-        self._torrent.shutdown()
-        self._social.shutdown()
-        self._db.shutdown()
+        """Trigger full application shutdown."""
+        logger.info("Application quit requested via UI.")
+        if self._tray:
+            self._tray.hide()
+        
+        # We don't shutdown engines here anymore to avoid hanging the UI.
+        # Calling QApplication.quit() will let the loop in main.py finish 
+        # where we'll handle a timed graceful shutdown.
         QApplication.quit()
 
     def closeEvent(self, event: QCloseEvent) -> None:

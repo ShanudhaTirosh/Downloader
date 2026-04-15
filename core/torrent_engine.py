@@ -583,15 +583,25 @@ class TorrentEngine(QObject):
         """Gracefully shut down the torrent engine."""
         if self._poll_timer:
             self._poll_timer.stop()
+            self._poll_timer = None
 
         if self._session:
-            resume_data = self.save_resume_data()
+            # Try once more to save resume data
+            try:
+                self.save_resume_data()
+            except Exception:
+                pass
+
             for info_hash, handle in list(self._handles.items()):
                 try:
-                    handle.pause()
+                    if handle.is_valid():
+                        handle.pause()
                 except Exception:
                     pass
             self._handles.clear()
-            logger.info("Torrent engine shut down (%d resume data saved)", len(resume_data))
+            
+            # Explicitly clear session to stop background threads
+            self._session = None
+            logger.info("Torrent engine shut down.")
 
         self._initialized = False

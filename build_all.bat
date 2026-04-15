@@ -20,27 +20,26 @@ if %ERRORLEVEL% NEQ 0 (
 :: 2. Build the installer using Inno Setup
 echo [2/2] Building setup.exe (Inno Setup)...
 
-:: Try to find ISCC.exe in default locations
 set "ISCC_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+if not exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" set "ISCC_PATH=C:\Program Files\Inno Setup 6\ISCC.exe"
 
-if not exist "%ISCC_PATH%" (
-    set "ISCC_PATH=C:\Program Files\Inno Setup 6\ISCC.exe"
-)
+if not exist "%ISCC_PATH%" goto :no_inno
+goto :run_inno
 
-if not exist "%ISCC_PATH%" (
-    echo [WARNING] Inno Setup Compiler (ISCC.exe) not found at default locations.
-    echo Please install Inno Setup from: https://jrsoftware.org/isdl.php
-    echo Or manually run ISCC on installer_script.iss
-    exit /b 1
-)
+:no_inno
+echo [ERROR] Inno Setup Compiler (ISCC.exe) not found.
+echo Please install Inno Setup from: https://jrsoftware.org/isdl.php
+exit /b 1
 
+:run_inno
 echo Using Inno Setup: "%ISCC_PATH%"
 "%ISCC_PATH%" installer_script.iss
 
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] Inno Setup compilation failed.
-    exit /b %ERRORLEVEL%
-)
+if %ERRORLEVEL% EQU 0 goto :build_success
+echo [ERROR] Inno Setup compilation failed.
+exit /b %ERRORLEVEL%
+
+:build_success
 
 echo.
 echo ========================================
